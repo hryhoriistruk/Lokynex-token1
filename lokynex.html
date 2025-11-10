@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyToken Interface</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        .token-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+        .label { font-weight: 600; color: #495057; }
+        .value { color: #667eea; font-family: monospace; }
+        .section {
+            margin: 30px 0;
+        }
+        .section h2 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        input, button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .accounts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .account-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .account-card:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+        .account-card.active {
+            background: #667eea;
+            color: white;
+        }
+        .account-addr {
+            font-size: 12px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🪙 MyToken Interface</h1>
+    <p style="color: #6c757d; margin-bottom: 20px;">Управління вашими токенами через браузер</p>
+
+    <div class="token-info">
+        <h3 style="margin-bottom: 15px;">📊 Інформація про токен</h3>
+        <div class="info-row">
+            <span class="label">Назва:</span>
+            <span class="value" id="tokenName">Завантаження...</span>
+        </div>
+        <div class="info-row">
+            <span class="label">Символ:</span>
+            <span class="value" id="tokenSymbol">-</span>
+        </div>
+        <div class="info-row">
+            <span class="label">Загальна кількість:</span>
+            <span class="value" id="totalSupply">-</span>
+        </div>
+        <div class="info-row">
+            <span class="label">Адреса контракту:</span>
+            <span class="value" style="font-size: 12px;">0x5FbDB2315678afecb367f032d93F642f64180aa3</span>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>👛 Ваш акаунт</h2>
+        <div class="info-row">
+            <span class="label">Адреса:</span>
+            <span class="value" id="currentAccount" style="font-size: 12px;">-</span>
+        </div>
+        <div class="info-row">
+            <span class="label">Баланс токенів:</span>
+            <span class="value" id="balance">-</span>
+        </div>
+        <button onclick="loadBalance()">🔄 Оновити баланс</button>
+    </div>
+
+    <div class="section">
+        <h2>💸 Перевести токени</h2>
+        <input type="text" id="recipient" placeholder="Адреса отримувача (0x...)">
+        <input type="number" id="amount" placeholder="Кількість токенів">
+        <button onclick="transfer()">Відправити</button>
+    </div>
+
+    <div class="section">
+        <h2>🔑 Швидкий вибір акаунта Anvil</h2>
+        <div class="accounts" id="accounts"></div>
+    </div>
+
+    <div id="status" class="status"></div>
+    <div id="loading" class="loading">⏳ Обробка...</div>
+</div>
+
+<script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+<script>
+    const TOKEN_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+    const RPC_URL = 'http://127.0.0.1:8545';
+
+    const TOKEN_ABI = [
+        'function name() view returns (string)',
+        'function symbol() view returns (string)',
+        'function totalSupply() view returns (uint256)',
+        'function balanceOf(address) view returns (uint256)',
+        'function transfer(address to, uint256 amount) returns (bool)'
+    ];
+
+    const ANVIL_ACCOUNTS = [
+        {addr: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', key: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'},
+        {addr: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', key: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d'},
+        {addr: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', key: '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a'},
+        {addr: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', key: '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6'}
+    ];
+
+    let provider, currentWallet, token;
+
+    async function init() {
+        provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+        currentWallet = new ethers.Wallet(ANVIL_ACCOUNTS[0].key, provider);
+        token = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, currentWallet);
+
+        await loadTokenInfo();
+        await loadBalance();
+        renderAccounts();
+    }
+
+    async function loadTokenInfo() {
+        try {
+            const name = await token.name();
+            const symbol = await token.symbol();
+            const supply = await token.totalSupply();
+
+            document.getElementById('tokenName').textContent = name;
+            document.getElementById('tokenSymbol').textContent = symbol;
+            document.getElementById('totalSupply').textContent = ethers.utils.formatEther(supply) + ' ' + symbol;
+        } catch (e) {
+            showStatus('Помилка завантаження інформації: ' + e.message, 'error');
+        }
+    }
+
+    async function loadBalance() {
+        try {
+            document.getElementById('currentAccount').textContent = currentWallet.address;
+            const balance = await token.balanceOf(currentWallet.address);
+            const symbol = await token.symbol();
+            document.getElementById('balance').textContent = ethers.utils.formatEther(balance) + ' ' + symbol;
+        } catch (e) {
+            showStatus('Помилка завантаження балансу: ' + e.message, 'error');
+        }
+    }
+
+    async function transfer() {
+        const recipient = document.getElementById('recipient').value;
+        const amount = document.getElementById('amount').value;
+
+        if (!recipient || !amount) {
+            showStatus('Заповніть всі поля!', 'error');
+            return;
+        }
+
+        try {
+            showLoading(true);
+            const amountWei = ethers.utils.parseEther(amount);
+            const tx = await token.transfer(recipient, amountWei);
+
+            showStatus('Транзакція відправлена: ' + tx.hash, 'success');
+
+            await tx.wait();
+            showStatus('✅ Токени успішно переведені!', 'success');
+
+            await loadBalance();
+            document.getElementById('recipient').value = '';
+            document.getElementById('amount').value = '';
+        } catch (e) {
+            showStatus('❌ Помилка: ' + e.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+
+    function renderAccounts() {
+        const container = document.getElementById('accounts');
+        ANVIL_ACCOUNTS.forEach((acc, idx) => {
+            const card = document.createElement('div');
+            card.className = 'account-card' + (idx === 0 ? ' active' : '');
+            card.innerHTML = `
+                    <div style="font-weight: 600; margin-bottom: 5px;">Акаунт ${idx + 1}</div>
+                    <div class="account-addr">${acc.addr.slice(0, 10)}...${acc.addr.slice(-8)}</div>
+                `;
+            card.onclick = () => switchAccount(idx);
+            container.appendChild(card);
+        });
+    }
+
+    async function switchAccount(idx) {
+        currentWallet = new ethers.Wallet(ANVIL_ACCOUNTS[idx].key, provider);
+        token = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, currentWallet);
+
+        document.querySelectorAll('.account-card').forEach((card, i) => {
+            card.classList.toggle('active', i === idx);
+        });
+
+        await loadBalance();
+        showStatus('Акаунт змінено на ' + ANVIL_ACCOUNTS[idx].addr, 'success');
+    }
+
+    function showStatus(message, type) {
+        const status = document.getElementById('status');
+        status.textContent = message;
+        status.className = 'status ' + type;
+        status.style.display = 'block';
+        setTimeout(() => status.style.display = 'none', 5000);
+    }
+
+    function showLoading(show) {
+        document.getElementById('loading').style.display = show ? 'block' : 'none';
+    }
+
+    init();
+</script>
+</body>
+</html>
